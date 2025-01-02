@@ -1,5 +1,6 @@
 defmodule Flights.Application do
   use Application
+  require Logger
 
   def start(_type, _args) do
     children = [
@@ -7,6 +8,17 @@ defmodule Flights.Application do
     ]
 
     opts = [strategy: :one_for_one, name: Flights.Supervisor]
-    Supervisor.start_link(children, opts)
+    {:ok, supervisor_pid} = Supervisor.start_link(children, opts)
+    Logger.info("Supervisor PID: #{inspect(supervisor_pid)}")
+
+    # Retrieve and log the process ID of the Flights.TCPListener GenServer
+    case Supervisor.which_children(Flights.Supervisor) do
+      [{_, child_pid, _, _} | _] ->
+        Logger.info("Flights.TCPListener process ID: #{inspect(child_pid)}")
+      _ ->
+        Logger.error("Failed to retrieve Flights.TCPListener process ID")
+    end
+
+    {:ok, supervisor_pid}
   end
 end

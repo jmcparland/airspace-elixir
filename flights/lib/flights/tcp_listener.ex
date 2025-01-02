@@ -24,6 +24,7 @@ defmodule Flights.TCPListener do
     schedule_work()
 
     send(self(), :test_message)
+    send(self(), :fred)
 
     {:ok, initial_state, {:continue, :connect}}
   end
@@ -70,6 +71,11 @@ defmodule Flights.TCPListener do
   @impl true
   def handle_info(:test_message, state) do
     Logger.info("Received :test_message")
+    {:noreply, state}
+  end
+
+  def handle_info(msg, state) do
+    Logger.warning("Unhandled message: #{inspect(msg)}")
     {:noreply, state}
   end
 
