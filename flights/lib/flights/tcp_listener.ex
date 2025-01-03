@@ -4,7 +4,8 @@ defmodule Flights.TCPListener do
 
   @host {192, 168, 6, 77}
   @port 30003
-  @interval 5_000  # Interval in milliseconds
+  # Interval in milliseconds
+  @interval 5_000
 
   def start_link(_) do
     GenServer.start_link(__MODULE__, %{}, name: __MODULE__)
@@ -32,33 +33,54 @@ defmodule Flights.TCPListener do
     {:ok, initial_state, {:continue, :connect}}
   end
 
-
   @impl true
   def handle_continue(:connect, state) do
-    case :gen_tcp.connect(@host, @port, [:binary, active: false, packet: :line]) do
+    case :gen_tcp.connect(@host, @port, [:binary, active: :once, packet: :line]) do
       {:ok, socket} ->
         Logger.info("Connected to #{format_ip(@host)}:#{@port}")
-        {:noreply, Map.put(state, :socket, socket), {:continue, :listen}}
+        {:noreply, Map.put(state, :socket, socket)}
+
       {:error, reason} ->
         Logger.error("Failed to connect: #{reason}")
         {:stop, reason, state}
     end
   end
 
+  # @impl true
+  # def handle_continue(:listen, %{socket: socket} = state) do
+  #   case :gen_tcp.recv(socket, 0) do
+  #     {:ok, data} ->
+  #       trimmed_data = String.trim(data)
+
+  #       # Logger.info(trimmed_data)
+
+  #       new_state = process_line(trimmed_data, state)
+  #       {:noreply, new_state, {:continue, :listen}}
+  #     {:error, reason} ->
+  #       Logger.error("Connection error: #{reason}")
+  #       {:stop, reason, state}
+  #   end
+  # end
+
   @impl true
-  def handle_continue(:listen, %{socket: socket} = state) do
-    case :gen_tcp.recv(socket, 0) do
-      {:ok, data} ->
-        trimmed_data = String.trim(data)
+  def handle_info({:tcp, socket, data}, state) do
+    trimmed_data = String.trim(data)
+    new_state = process_line(trimmed_data, state)
+    # Set the socket back to active once
+    :inet.setopts(socket, active: :once)
+    {:noreply, new_state}
+  end
 
-        # Logger.info(trimmed_data)
+  @impl true
+  def handle_info({:tcp_closed, _socket}, state) do
+    Logger.info("Socket closed")
+    {:stop, :normal, state}
+  end
 
-        new_state = process_line(trimmed_data, state)
-        {:noreply, new_state, {:continue, :listen}}
-      {:error, reason} ->
-        Logger.error("Connection error: #{reason}")
-        {:stop, reason, state}
-    end
+  @impl true
+  def handle_info({:tcp_error, _socket, reason}, state) do
+    Logger.error("TCP error: #{reason}")
+    {:stop, reason, state}
   end
 
   @impl true
@@ -99,15 +121,18 @@ defmodule Flights.TCPListener do
     |> String.trim_trailing("\r")
     |> String.split(",")
     |> case do
-      [_,_,_,_,id|_] = list ->
-        new_flights = Map.update(state[:flights], id, list, fn old_list ->
-          Enum.zip(old_list, list)
-          |> Enum.map(fn
-            {old, new} when new in [nil, ""] -> old
-            {_, new} -> new
+      [_, _, _, _, id | _] = list ->
+        new_flights =
+          Map.update(state[:flights], id, list, fn old_list ->
+            Enum.zip(old_list, list)
+            |> Enum.map(fn
+              {old, new} when new in [nil, ""] -> old
+              {_, new} -> new
+            end)
           end)
-        end)
+
         Map.put(state, :flights, new_flights)
+
       _ ->
         state
     end
@@ -117,5 +142,4 @@ defmodule Flights.TCPListener do
     Logger.info("Scheduling work")
     Process.send_after(self(), :display_state, @interval)
   end
-
 end
