@@ -5,7 +5,7 @@ defmodule Flights.TCPListener do
   @host {192, 168, 6, 77}
   @port 30003
   @airspace_dump_interval 5_000
-  @aging_threshold 2 * 60 * 1000
+  @ageoff_threshold 2 * 60 * 1000
 
   def start_link(_) do
     GenServer.start_link(__MODULE__, %{}, name: __MODULE__)
@@ -13,18 +13,10 @@ defmodule Flights.TCPListener do
 
   @impl true
   def init(state) do
-    # process_id = self()
-    # parent_id = Process.info(self(), :parent) |> elem(1)
-
     Logger.info("GenServer Initializing")
-    # Logger.info("Process ID: #{inspect(process_id)}")
-    # Logger.info("Parent Process ID: #{inspect(parent_id)}")
-
     initial_state = Map.put(state, :flights, %{})
-
-    schedule_airspace_dump()
-    schedule_airspace_ageoff()
-
+    schedule_airspace_inspection(@airspace_dump_interval)
+    schedule_airspace_ageoff(@ageoff_threshold)
     {:ok, initial_state, {:continue, :connect}}
   end
 
@@ -45,7 +37,6 @@ defmodule Flights.TCPListener do
   def handle_info({:tcp, socket, data}, state) do
     trimmed_data = String.trim(data)
     new_state = process_observation(trimmed_data, state)
-    # Set the socket back to active once
     :inet.setopts(socket, active: :once)
     {:noreply, new_state}
   end
@@ -66,13 +57,7 @@ defmodule Flights.TCPListener do
   def handle_info(:display_state, state) do
     Logger.info("Received :display_state message")
     IO.inspect(state[:flights], label: "Flights Dictionary")
-    schedule_airspace_dump()
-    {:noreply, state}
-  end
-
-  def handle_info(msg, state) do
-    Logger.warning("Unhandled message: #{inspect(msg)}")
-    # {:stop, :normal, state}
+    schedule_airspace_inspection(@airspace_dump_interval)
     {:noreply, state}
   end
 
@@ -80,8 +65,14 @@ defmodule Flights.TCPListener do
   def handle_info(:airspace_ageoff, state) do
     Logger.info("Removing outdated flights")
     new_state = remove_outdated_flights(state)
-    schedule_airspace_ageoff()
+    schedule_airspace_ageoff(@ageoff_threshold)
     {:noreply, new_state}
+  end
+
+  def handle_info(msg, state) do
+    Logger.warning("Unhandled message: #{inspect(msg)}")
+    # {:stop, :normal, state}
+    {:noreply, state}
   end
 
   @impl true
@@ -130,20 +121,20 @@ defmodule Flights.TCPListener do
     new_flights =
       state[:flights]
       |> Enum.filter(fn {_id, {_list, timestamp}} ->
-        current_time - timestamp <= @aging_threshold
+        current_time - timestamp <= @ageoff_threshold
       end)
       |> Enum.into(%{})
 
     Map.put(state, :flights, new_flights)
   end
 
-  defp schedule_airspace_dump() do
+  defp schedule_airspace_inspection(delay_ms) do
     Logger.info("Scheduling airspace inspection")
-    Process.send_after(self(), :display_state, @airspace_dump_interval)
+    Process.send_after(self(), :display_state, delay_ms)
   end
 
-  defp schedule_airspace_ageoff() do
+  defp schedule_airspace_ageoff(delay_ms) do
     Logger.info("Scheduling airspace ageoff")
-    Process.send_after(self(), :airspace_ageoff, @aging_threshold)
+    Process.send_after(self(), :airspace_ageoff, delay_ms)
   end
 end
