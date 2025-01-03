@@ -15,24 +15,23 @@ defmodule Flights.TCPListener do
     process_id = self()
     parent_id = Process.info(self(), :parent) |> elem(1)
 
-    Logger.info("Initializing GenServer")
+    # send(self(), :test_message)
+    Process.send_after(self(), :test_message, 10_000)
+
+    Logger.info("GenServer Initializing")
     Logger.info("Process ID: #{inspect(process_id)}")
     Logger.info("Parent Process ID: #{inspect(parent_id)}")
 
     initial_state = Map.put(state, :flights, %{})
 
     schedule_work()
+    Process.send_after(self(), :test_message, 0)
 
-    send(self(), :test_message)
-    send(self(), :fred)
+    Logger.info("Initial state: #{inspect(state)}")
 
     {:ok, initial_state, {:continue, :connect}}
   end
 
-  defp schedule_work() do
-    Logger.info("Scheduling work")
-    Process.send_after(self(), :display_state, @interval)
-  end
 
   @impl true
   def handle_continue(:connect, state) do
@@ -51,7 +50,9 @@ defmodule Flights.TCPListener do
     case :gen_tcp.recv(socket, 0) do
       {:ok, data} ->
         trimmed_data = String.trim(data)
-        Logger.info(trimmed_data)
+
+        # Logger.info(trimmed_data)
+
         new_state = process_line(trimmed_data, state)
         {:noreply, new_state, {:continue, :listen}}
       {:error, reason} ->
@@ -76,10 +77,24 @@ defmodule Flights.TCPListener do
 
   def handle_info(msg, state) do
     Logger.warning("Unhandled message: #{inspect(msg)}")
+    # {:stop, :normal, state}
     {:noreply, state}
   end
 
-  def process_line(line, state) do
+  @impl true
+  def terminate(_reason, %{socket: socket}) do
+    :gen_tcp.close(socket)
+    :ok
+  end
+
+  @impl true
+  def terminate(_reason, _state) do
+    :ok
+  end
+
+  defp format_ip({a, b, c, d}), do: "#{a}.#{b}.#{c}.#{d}"
+
+  defp process_line(line, state) do
     line
     |> String.trim_trailing("\r")
     |> String.split(",")
@@ -98,16 +113,9 @@ defmodule Flights.TCPListener do
     end
   end
 
-  @impl true
-  def terminate(_reason, %{socket: socket}) do
-    :gen_tcp.close(socket)
-    :ok
+  defp schedule_work() do
+    Logger.info("Scheduling work")
+    Process.send_after(self(), :display_state, @interval)
   end
 
-  @impl true
-  def terminate(_reason, _state) do
-    :ok
-  end
-
-  defp format_ip({a, b, c, d}), do: "#{a}.#{b}.#{c}.#{d}"
 end
