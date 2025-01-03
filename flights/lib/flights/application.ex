@@ -15,7 +15,7 @@ defmodule Flights.Application do
     case Supervisor.which_children(Flights.Supervisor) do
       [{_, child_pid, _, _} | _] ->
         Logger.info("Flights.TCPListener process ID: #{inspect(child_pid)}")
-        send(child_pid, :fred)
+
       _ ->
         Logger.error("Failed to retrieve Flights.TCPListener process ID")
     end
