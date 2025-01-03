@@ -2,10 +2,12 @@ defmodule Flights.TCPListener do
   use GenServer
   require Logger
 
-  @host {192, 168, 6, 77}
-  @port 30003
-  @airspace_dump_interval 5_000
-  @ageoff_threshold 2 * 60 * 1000
+  @host Application.compile_env(:flights, Flights.TCPListener, [])[:host]
+  @port Application.compile_env(:flights, Flights.TCPListener, [])[:port]
+  @airspace_dump_interval Application.compile_env(:flights, Flights.TCPListener, [])[
+                            :airspace_dump_interval
+                          ]
+  @ageoff_threshold Application.compile_env(:flights, Flights.TCPListener, [])[:ageoff_threshold]
 
   def start_link(_) do
     GenServer.start_link(__MODULE__, %{}, name: __MODULE__)
