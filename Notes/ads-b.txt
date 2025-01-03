@@ -1,0 +1,24 @@
+https://discussions.flightaware.com/t/exploring-port-30003-and-30106/27752
+
+message type
+transmission type
+session id
+aircraft id
+aircraft hexadecimal code
+flight record number
+date message generated
+time message generated
+date message logged
+time message logged
+callsign
+altitude
+groundspeed
+track/heading
+latitude
+longitude
+vertical rate
+squawk code
+alert (squawk change)
+emergency
+SPI (transponder ident)
+Is On Ground
