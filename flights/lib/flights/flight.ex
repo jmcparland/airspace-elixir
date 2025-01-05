@@ -4,7 +4,7 @@ defmodule Flights.Flight do
 
   def start(adsb) do
     icao = Enum.at(adsb, 4)
-    GenServer.start(__MODULE__, adsb, name: {:global, icao})
+    GenServer.start(__MODULE__, adsb, name: {:via, Registry, {Flights.Registry, icao}})
   end
 
   @impl true

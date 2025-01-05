@@ -68,13 +68,11 @@ defmodule Flights.TCPListener do
     |> String.split(",")
     |> case do
       [_, _, _, _, icao | _] = adsb ->
-        flight_name = {:global, icao}
-
-        case GenServer.whereis(flight_name) do
-          nil ->
+        case Registry.lookup(Flights.Registry, icao) do
+          [] ->
             {:ok, _pid} = Flights.Flight.start(adsb)
 
-          pid ->
+          [{pid, _}] ->
             GenServer.cast(pid, {:update, adsb})
         end
 
@@ -86,14 +84,9 @@ defmodule Flights.TCPListener do
   # TESTING
 
   def list_flight_processes do
-    Process.registered()
-    |> Enum.filter(fn
-      {:global, _icao} -> true
-      _ -> false
-    end)
+    Registry.select(Flights.Registry, [{{:"$1", :"$2", :"$3"}, [], [:"$1"]}])
   end
 
-  # New function to get the count of flight processes
   def flight_process_count do
     list_flight_processes()
     |> length()
