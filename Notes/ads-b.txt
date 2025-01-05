@@ -4,13 +4,13 @@ message type
 transmission type
 session id
 aircraft id
-aircraft hexadecimal code
+4   aircraft hexadecimal code
 flight record number
 date message generated
 time message generated
 date message logged
 time message logged
-callsign
+10  callsign
 altitude
 groundspeed
 track/heading
