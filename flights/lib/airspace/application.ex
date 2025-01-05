@@ -1,15 +1,15 @@
-defmodule Flights.Application do
+defmodule Airspace.Application do
   use Application
   require Logger
 
   def start(_type, _args) do
     children = [
-      {Registry, keys: :unique, name: Flights.Registry},
-      Flights.TCPListener,
-      Flights.Reporter
+      {Registry, keys: :unique, name: Airspace.Registry},
+      Airspace.TCPListener,
+      Airspace.Reporter
     ]
 
-    opts = [strategy: :one_for_one, name: Flights.Supervisor]
+    opts = [strategy: :one_for_one, name: Airspace.Supervisor]
     {:ok, supervisor_pid} = Supervisor.start_link(children, opts)
     Logger.info("Supervisor PID: #{inspect(supervisor_pid)}")
 

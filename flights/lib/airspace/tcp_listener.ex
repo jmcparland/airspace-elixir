@@ -1,9 +1,9 @@
-defmodule Flights.TCPListener do
+defmodule Airspace.TCPListener do
   use GenServer
   require Logger
 
-  @host Application.compile_env(:flights, Flights.TCPListener, [])[:host]
-  @port Application.compile_env(:flights, Flights.TCPListener, [])[:port]
+  @host Application.compile_env(:airspace, Airspace.TCPListener, [])[:host]
+  @port Application.compile_env(:airspace, Airspace.TCPListener, [])[:port]
 
   def start_link(_) do
     GenServer.start_link(__MODULE__, %{}, name: __MODULE__)
@@ -12,7 +12,7 @@ defmodule Flights.TCPListener do
   @impl true
   def init(state) do
     Logger.info("TCPListener Initializing")
-    initial_state = Map.put(state, :flights, %{})
+    initial_state = %{}
     {:ok, initial_state, {:continue, :connect}}
   end
 
@@ -68,9 +68,9 @@ defmodule Flights.TCPListener do
     |> String.split(",")
     |> case do
       [_, _, _, _, icao | _] = adsb ->
-        case Registry.lookup(Flights.Registry, icao) do
+        case Registry.lookup(Airspace.Registry, icao) do
           [] ->
-            {:ok, _pid} = Flights.Flight.start(adsb)
+            {:ok, _pid} = Airspace.Flight.start(adsb)
 
           [{pid, _}] ->
             GenServer.cast(pid, {:update, adsb})
@@ -84,7 +84,7 @@ defmodule Flights.TCPListener do
   # TESTING
 
   def list_flight_processes do
-    Registry.select(Flights.Registry, [{{:"$1", :"$2", :"$3"}, [], [:"$1"]}])
+    Registry.select(Airspace.Registry, [{{:"$1", :"$2", :"$3"}, [], [:"$1"]}])
   end
 
   def flight_process_count do

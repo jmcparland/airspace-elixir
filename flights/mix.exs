@@ -1,9 +1,9 @@
-defmodule Flights.MixProject do
+defmodule Airspace.MixProject do
   use Mix.Project
 
   def project do
     [
-      app: :flights,
+      app: :airspace,
       version: "0.1.0",
       elixir: "~> 1.18",
       start_permanent: Mix.env() == :prod,
@@ -15,7 +15,7 @@ defmodule Flights.MixProject do
   def application do
     [
       extra_applications: [:logger],
-      mod: {Flights.Application, []}
+      mod: {Airspace.Application, []}
     ]
   end
 

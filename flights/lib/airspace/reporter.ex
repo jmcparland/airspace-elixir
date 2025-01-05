@@ -1,4 +1,4 @@
-defmodule Flights.Reporter do
+defmodule Airspace.Reporter do
   use GenServer
   require Logger
 
