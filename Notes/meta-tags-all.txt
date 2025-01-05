@@ -1,0 +1,141 @@
+iex(17)> meta_tags = Floki.find(parsed_html, "meta")
+[
+  {"meta",
+   [
+     {"http-equiv", "Content-Type"},
+     {"content", "text/html; charset=utf-8"}
+   ], []},
+  {"meta",
+   [{"http-equiv", "X-UA-Compatible"}, {"content", "IE=edge"}], []},
+  {"meta", [{"name", "twitter:site"}, {"content", "@FlightAware"}],
+   []},
+  {"meta",
+   [
+     {"name", "facebook-domain-verification"},
+     {"content", "ijk4kalzz9je9chk38y60825grrr8m"}
+   ], []},
+  {"meta",
+   [
+     {"name", "viewport"},
+     {"content",
+      "width=device-width, initial-scale=1, user-scalable=no"}
+   ], []},
+  {"meta",
+   [
+     {"name", "twitter:image"},
+     {"content",
+      "https://www.flightaware.com/ajax/flight/map/WWI70/20250105/1330Z/KTEB/KPDK/?width=800&height=418&dpi=2"}
+   ], []},
+  {"meta", [{"name", "origin"}, {"content", "KTEB"}], []},
+  {"meta",
+   [
+     {"name", "twitter:description"},
+     {"content",
+      "Track Worldwide Jet Charter  #70 flight from Teterboro to Dekalb-Peachtree"}
+   ], []},
+  {"meta", [{"name", "destination"}, {"content", "KPDK"}], []},
+  {"meta", [{"name", "twitter:site"}, {"content", "@flightaware"}],
+   []},
+  {"meta",
+   [
+     {"name", "description"},
+     {"content",
+      "Flight status, tracking, and historical data for Worldwide Jet Charter 70 (WWI70) including scheduled, estimated, and actual departure and arrival times."}
+   ], []},
+  {"meta", [{"name", "aircrafttype"}, {"content", "GLEX"}], []},
+  {"meta",
+   [{"name", "twitter:card"}, {"content", "summary_large_image"}],
+   []},
+  {"meta",
+   [
+     {"name", "title"},
+     {"content",
+      "WWI70 Worldwide Jet Charter Flight Tracking and History"}
+   ], []},
+  {"meta",
+   [
+     {"name", "og:description"},
+     {"content",
+      "Flight status, tracking, and historical data for Worldwide Jet Charter 70 (WWI70) including scheduled, estimated, and actual departure and arrival times."}
+   ], []},
+  {"meta", [{"name", "airline"}, {"content", "WWI"}], []},
+  {"meta",
+   [{"name", "twitter:domain"}, {"content", "flightaware.com"}], []},
+  {"meta",
+   [
+     {"property", "og:title"},
+     {"content",
+      "WWI70 Worldwide Jet Charter Flight Tracking and History - FlightAware"}
+   ], []},
+  {"meta", [{"property", "og:site_name"}, {"content", "FlightAware"}],
+   []},
+  {"meta",
+   [
+     {"property", "og:url"},
+     {"content", "http://www.flightaware.com/live/flight/WWI70"}
+   ], []},
+  {"meta", [{"property", "og:type"}, {"content", "website"}], []},
+  {"meta",
+   [
+     {"property", "og:description"},
+     {"content",
+      "Track Worldwide Jet Charter  #70 flight from Teterboro to Dekalb-Peachtree"}
+   ], []},
+  {"meta", [{"property", "og:image:width"}, {"content", "1200"}], []},
+  {"meta",
+   [
+     {"property", "og:image:alt"},
+     {"content", "Track Worldwide Jet Charter  #70 flight"}
+   ], []},
+  {"meta", [{"property", "og:image:height"}, {"content", "630"}], []},
+  {"meta",
+   [
+     {"property", "og:image"},
+     {"content",
+      "https://www.flightaware.com/ajax/flight/map/WWI70/20250105/1330Z/KTEB/KPDK/?width=1200&height=630&dpi=2"}
+   ], []},
+  {"meta", [{"property", "og:image:type"}, {"content", "image/png"}],
+   []}
+]
+
+
+iex> meta_dict = Enum.reduce(meta_tags, %{}, fn {"meta", attrs, _}, acc ->
+  case Enum.find(attrs, fn {key, _} -> key in ["name", "property"] end) do
+    {key, name} ->
+      case Enum.find(attrs, fn {key, _} -> key == "content" end) do
+        {"content", content} ->
+          Map.put(acc, name, content)
+        _ ->
+          acc
+      end
+    _ ->
+      acc
+  end
+end)
+
+%{
+  "aircrafttype" => "GLEX",
+  "airline" => "WWI",
+  "description" => "Flight status, tracking, and historical data for Worldwide Jet Charter 70 (WWI70) including scheduled, estimated, and actual departure and arrival times.",
+  "destination" => "KPDK",
+  "facebook-domain-verification" => "ijk4kalzz9je9chk38y60825grrr8m",
+  "og:description" => "Track Worldwide Jet Charter  #70 flight from Teterboro to Dekalb-Peachtree",
+  "og:image" => "https://www.flightaware.com/ajax/flight/map/WWI70/20250105/1330Z/KTEB/KPDK/?width=1200&height=630&dpi=2",
+  "og:image:alt" => "Track Worldwide Jet Charter  #70 flight",
+  "og:image:height" => "630",
+  "og:image:type" => "image/png",
+  "og:image:width" => "1200",
+  "og:site_name" => "FlightAware",
+  "og:title" => "WWI70 Worldwide Jet Charter Flight Tracking and History - FlightAware",
+  "og:type" => "website",
+  "og:url" => "http://www.flightaware.com/live/flight/WWI70",
+  "origin" => "KTEB",
+  "title" => "WWI70 Worldwide Jet Charter Flight Tracking and History",
+  "twitter:card" => "summary_large_image",
+  "twitter:description" => "Track Worldwide Jet Charter  #70 flight from Teterboro to Dekalb-Peachtree",
+  "twitter:domain" => "flightaware.com",
+  "twitter:image" => "https://www.flightaware.com/ajax/flight/map/WWI70/20250105/1330Z/KTEB/KPDK/?width=800&height=418&dpi=2",
+  "twitter:site" => "@flightaware",
+  "viewport" => "width=device-width, initial-scale=1, user-scalable=no"
+}
+

@@ -1,0 +1,7 @@
+		<meta property="og:url" content="http://www.flightaware.com/live/flight/WWI70"/>
+
+		<meta name="origin" content="KTEB"/>
+		<meta name="destination" content="KPDK"/>
+		<meta name="twitter:description" content="Track Worldwide Jet Charter  #70 flight from Teterboro to Dekalb-Peachtree"/>
+		<meta property="og:description" content="Track Worldwide Jet Charter  #70 flight from Teterboro to Dekalb-Peachtree"/>
+		

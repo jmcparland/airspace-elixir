@@ -10,7 +10,7 @@ defmodule Airspace.TCPListener do
   end
 
   @impl true
-  def init(state) do
+  def init(_state) do
     Logger.info("TCPListener Initializing")
     initial_state = %{}
     {:ok, initial_state, {:continue, :connect}}
