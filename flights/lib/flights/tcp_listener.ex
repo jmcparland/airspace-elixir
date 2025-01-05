@@ -4,10 +4,6 @@ defmodule Flights.TCPListener do
 
   @host Application.compile_env(:flights, Flights.TCPListener, [])[:host]
   @port Application.compile_env(:flights, Flights.TCPListener, [])[:port]
-  @airspace_dump_interval Application.compile_env(:flights, Flights.TCPListener, [])[
-                            :airspace_dump_interval
-                          ]
-  @ageoff_threshold Application.compile_env(:flights, Flights.TCPListener, [])[:ageoff_threshold]
 
   def start_link(_) do
     GenServer.start_link(__MODULE__, %{}, name: __MODULE__)
@@ -15,10 +11,8 @@ defmodule Flights.TCPListener do
 
   @impl true
   def init(state) do
-    Logger.info("GenServer Initializing")
+    Logger.info("TCPListener Initializing")
     initial_state = Map.put(state, :flights, %{})
-    schedule_airspace_inspection(@airspace_dump_interval)
-    schedule_airspace_ageoff(@ageoff_threshold)
     {:ok, initial_state, {:continue, :connect}}
   end
 
@@ -38,9 +32,9 @@ defmodule Flights.TCPListener do
   @impl true
   def handle_info({:tcp, socket, data}, state) do
     trimmed_data = String.trim(data)
-    new_state = process_observation(trimmed_data, state)
+    _ = process_observation(trimmed_data)
     :inet.setopts(socket, active: :once)
-    {:noreply, new_state}
+    {:noreply, state}
   end
 
   @impl true
@@ -56,28 +50,6 @@ defmodule Flights.TCPListener do
   end
 
   @impl true
-  def handle_info(:display_state, state) do
-    Logger.info("Received :display_state message")
-    IO.inspect(state[:flights], label: "Flights Dictionary")
-    schedule_airspace_inspection(@airspace_dump_interval)
-    {:noreply, state}
-  end
-
-  @impl true
-  def handle_info(:airspace_ageoff, state) do
-    Logger.info("Removing outdated flights")
-    new_state = remove_outdated_flights(state)
-    schedule_airspace_ageoff(@ageoff_threshold)
-    {:noreply, new_state}
-  end
-
-  def handle_info(msg, state) do
-    Logger.warning("Unhandled message: #{inspect(msg)}")
-    # {:stop, :normal, state}
-    {:noreply, state}
-  end
-
-  @impl true
   def terminate(_reason, %{socket: socket}) do
     :gen_tcp.close(socket)
     :ok
@@ -90,53 +62,40 @@ defmodule Flights.TCPListener do
 
   defp format_ip({a, b, c, d}), do: "#{a}.#{b}.#{c}.#{d}"
 
-  defp process_observation(line, state) do
+  defp process_observation(line) do
     line
     |> String.trim_trailing("\r")
     |> String.split(",")
     |> case do
-      [_, _, _, _, id | _] = list ->
-        current_time = :os.system_time(:millisecond)
+      [_, _, _, _, icao | _] = adsb ->
+        flight_name = {:global, icao}
 
-        new_flights =
-          Map.update(state[:flights], id, {list, current_time}, fn {old_list, _} ->
-            updated_list =
-              Enum.zip(old_list, list)
-              |> Enum.map(fn
-                {old, new} when new in [nil, ""] -> old
-                {_, new} -> new
-              end)
+        case GenServer.whereis(flight_name) do
+          nil ->
+            {:ok, _pid} = Flights.Flight.start(adsb)
 
-            {updated_list, current_time}
-          end)
-
-        Map.put(state, :flights, new_flights)
+          pid ->
+            GenServer.cast(pid, {:update, adsb})
+        end
 
       _ ->
-        state
+        :ignore
     end
   end
 
-  defp remove_outdated_flights(state) do
-    current_time = :os.system_time(:millisecond)
+  # TESTING
 
-    new_flights =
-      state[:flights]
-      |> Enum.filter(fn {_id, {_list, timestamp}} ->
-        current_time - timestamp <= @ageoff_threshold
-      end)
-      |> Enum.into(%{})
-
-    Map.put(state, :flights, new_flights)
+  def list_flight_processes do
+    Process.registered()
+    |> Enum.filter(fn
+      {:global, _icao} -> true
+      _ -> false
+    end)
   end
 
-  defp schedule_airspace_inspection(delay_ms) do
-    Logger.info("Scheduling airspace inspection")
-    Process.send_after(self(), :display_state, delay_ms)
-  end
-
-  defp schedule_airspace_ageoff(delay_ms) do
-    Logger.info("Scheduling airspace ageoff")
-    Process.send_after(self(), :airspace_ageoff, delay_ms)
+  # New function to get the count of flight processes
+  def flight_process_count do
+    list_flight_processes()
+    |> length()
   end
 end
