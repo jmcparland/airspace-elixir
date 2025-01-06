@@ -9,11 +9,14 @@ defmodule Airspace.Flight do
   @primary_key {:id, :binary_id, autogenerate: true}
   schema "flights" do
     field(:icao, :string)
-    field(:first_observed_at, :utc_datetime)
-    field(:first_observed_vector, {:array, :string})
-    field(:complete_vector, {:array, :string})
-    field(:expired_vector, {:array, :string})
-    field(:metadata, :map)
+    field(:callsign, :string)
+    field(:origin, :string)
+    field(:destination, :string)
+    field(:description, :string)
+    field(:url, :string)
+    field(:first_vector, {:array, :string})
+    field(:first_complete, {:array, :string})
+    field(:last_vector, {:array, :string})
 
     timestamps()
   end
@@ -22,27 +25,31 @@ defmodule Airspace.Flight do
     flight
     |> cast(attrs, [
       :icao,
-      :first_observed_at,
-      :first_observed_vector,
-      :complete_vector,
-      :expired_vector,
-      :metadata
+      :callsign,
+      :origin,
+      :destination,
+      :description,
+      :url,
+      :first_vector,
+      :first_complete,
+      :last_vector
     ])
-    |> validate_required([:icao, :first_observed_at, :first_observed_vector])
+
+    # |> validate_required([:icao, :first_observed_at, :first_vector])
   end
 
   def start(adsb) do
-    Logger.info("Starting flight with ADS-B: #{inspect(adsb)}")
+    # Logger.info("Starting flight with ADS-B: #{inspect(adsb)}")
 
     icao = Enum.at(adsb, 4)
 
     case GenServer.start(__MODULE__, adsb, name: {:via, Registry, {Airspace.Registry, icao}}) do
       {:ok, pid} ->
-        Logger.info("Flight #{icao} started")
+        # Logger.info("Flight #{icao} started with PID: #{inspect(pid)}")
         {:ok, pid}
 
       {:error, {:already_started, pid}} ->
-        Logger.info("Flight #{icao} already started")
+        Logger.info("Flight #{icao} already started, PID is: #{inspect(pid)}")
         {:error, {:already_started, pid}}
 
       {:error, reason} ->
@@ -54,28 +61,29 @@ defmodule Airspace.Flight do
   @impl true
   def init(adsb) do
     icao = Enum.at(adsb, 4)
-    first_observed_at = DateTime.utc_now()
 
     GenServer.cast(Airspace.Reporter, {:report, "New: #{icao}"})
 
     initial_state = %{
       icao: icao,
+      callsign: nil,
+      origin: nil,
+      destination: nil,
+      description: nil,
+      url: nil,
+      first_vector: adsb,
+      last_vector: adsb,
+      metadata: nil,
       vector: adsb,
       expire: Process.send_after(self(), :expire, 120_000),
       complete: false,
-      callsign_scraped: :not_started,
-      first_observed_at: first_observed_at,
-      first_observed_vector: adsb,
-      complete_vector: nil,
-      expired_vector: nil,
-      metadata: %{}
+      callsign_scraped: :not_started
     }
 
     changeset = changeset(%Airspace.Flight{}, initial_state)
 
     case Repo.insert(changeset) do
       {:ok, flight} ->
-        Logger.info("Flight #{icao} inserted into the database")
         # Include the primary key in the state
         {:ok, Map.put(initial_state, :id, flight.id)}
 
@@ -86,8 +94,6 @@ defmodule Airspace.Flight do
 
         {:stop, :normal, initial_state}
     end
-
-    GenServer.cast(Airspace.Reporter, {:report, "New: #{icao}"})
   end
 
   @impl true
@@ -96,15 +102,13 @@ defmodule Airspace.Flight do
 
     changeset =
       changeset(%Airspace.Flight{id: state.id}, %{
-        expired_vector: state.vector,
-        icao: state.icao,
-        first_observed_at: state.first_observed_at,
-        first_observed_vector: state.first_observed_vector
+        last_vector: state.vector
       })
 
     case Repo.update(changeset) do
       {:ok, _flight} ->
-        Logger.info("Flight #{state.icao} expired vector updated in the database")
+        # Logger.info("Flight #{state.icao} expired vector updated in the database")
+        :ok
 
       {:error, changeset} ->
         Logger.error(
@@ -129,26 +133,26 @@ defmodule Airspace.Flight do
     new_state = Map.put(state, :vector, updated_vector)
     new_state = Map.put(new_state, :expire, Process.send_after(self(), :expire, 120_000))
 
+    # LIVE UPDATE -- MAYBE NOT NEEDED
+    changeset = changeset(%Airspace.Flight{id: state.id}, %{last_vector: updated_vector})
+    Repo.update(changeset)
+
     new_state =
       if not state.complete and complete?(updated_vector) do
-        GenServer.cast(Airspace.Reporter, {:report, inspect(updated_vector)})
-        Map.put(new_state, :complete, true)
+        GenServer.cast(Airspace.Reporter, {:report, "Complete: #{inspect(updated_vector)}"})
+        new_state = Map.put(new_state, :complete, true)
 
         changeset =
-          changeset(%Airspace.Flight{id: state.id}, %{
-            vector: updated_vector,
-            icao: state.icao,
-            first_observed_at: state.first_observed_at,
-            first_observed_vector: state.first_observed_vector
-          })
+          changeset(%Airspace.Flight{id: state.id}, %{first_complete: updated_vector})
 
         case Repo.update(changeset) do
           {:ok, _flight} ->
-            Logger.info("Flight #{state.icao} complete vector updated in the database")
+            # Logger.info("Flight #{state.icao} first_complete updated in the database")
+            :ok
 
           {:error, changeset} ->
             Logger.error(
-              "Failed to update complete vector for flight #{state.icao} in the database: #{inspect(changeset.errors)}"
+              "Failed to update last_vector for flight #{state.icao} in the database: #{inspect(changeset.errors)}"
             )
         end
 
@@ -160,9 +164,10 @@ defmodule Airspace.Flight do
     callsign = Enum.at(updated_vector, 10)
 
     new_state =
-      if callsign != "" and state.callsign_scraped == :not_started do
+      if state.callsign_scraped == :not_started and callsign != "" do
         GenServer.cast(self(), {:initiate_scrape, callsign})
-        Map.put(new_state, :callsign_scraped, :in_progress)
+        ns1 = Map.put(new_state, :callsign_scraped, :in_progress)
+        Map.put(ns1, :callsign, String.trim_trailing(callsign))
       else
         new_state
       end
@@ -176,21 +181,23 @@ defmodule Airspace.Flight do
     new_state =
       case Task.await(task, 5_000) do
         {:ok, metadata} ->
-          GenServer.cast(Airspace.Reporter, {:report, inspect(metadata)})
+          GenServer.cast(Airspace.Reporter, {:report, "Scraped: #{inspect(metadata)}"})
           new_state = Map.put(state, :callsign_scraped, :complete)
           new_state = Map.put(new_state, :metadata, metadata)
 
           changeset =
             changeset(%Airspace.Flight{id: state.id}, %{
-              metadata: metadata,
-              icao: state.icao,
-              first_observed_at: state.first_observed_at,
-              first_observed_vector: state.first_observed_vector
+              callsign: String.trim_trailing(callsign),
+              origin: metadata.origin,
+              destination: metadata.destination,
+              description: metadata.description,
+              url: metadata.url
             })
 
           case Repo.update(changeset) do
             {:ok, _flight} ->
-              Logger.info("Flight #{state.icao} metadata updated in the database")
+              # Logger.info("Flight #{state.icao} scrape info updated")
+              :ok
 
             {:error, changeset} ->
               Logger.error(
