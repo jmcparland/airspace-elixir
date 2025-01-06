@@ -32,9 +32,16 @@ defmodule Airspace.TCPListener do
   @impl true
   def handle_info({:tcp, socket, data}, state) do
     trimmed_data = String.trim(data)
-    _ = process_observation(trimmed_data)
-    :inet.setopts(socket, active: :once)
-    {:noreply, state}
+
+    case process_observation(trimmed_data) do
+      :ok ->
+        :inet.setopts(socket, active: :once)
+        {:noreply, state}
+
+      {:error, reason} ->
+        Logger.error("Failed to process observation: #{inspect(reason)}")
+        {:stop, reason, state}
+    end
   end
 
   @impl true
@@ -64,16 +71,23 @@ defmodule Airspace.TCPListener do
 
   defp process_observation(line) do
     line
-    |> String.trim_trailing("\r")
+    |> String.trim_trailing("\r\n")
     |> String.split(",")
     |> case do
       [_, _, _, _, icao | _] = adsb ->
         case Registry.lookup(Airspace.Registry, icao) do
           [] ->
-            {:ok, _pid} = Airspace.Flight.start(adsb)
+            case Airspace.Flight.start(adsb) do
+              {:ok, _pid} ->
+                :ok
+
+              {:error, reason} ->
+                {:error, reason}
+            end
 
           [{pid, _}] ->
             GenServer.cast(pid, {:update, adsb})
+            :ok
         end
 
       _ ->

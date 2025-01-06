@@ -6,7 +6,8 @@ defmodule Airspace.Application do
     children = [
       {Registry, keys: :unique, name: Airspace.Registry},
       Airspace.TCPListener,
-      Airspace.Reporter
+      Airspace.Reporter,
+      Airspace.Repo
     ]
 
     opts = [strategy: :one_for_one, name: Airspace.Supervisor]
