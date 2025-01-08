@@ -15,6 +15,9 @@ defmodule Airspace.Reporter do
   @impl true
   def handle_cast(%{event: event, message: message} = msg, state) when is_list(message) do
     Logger.info("#{event}: #{inspect(message)}")
+
+    Phoenix.PubSub.broadcast(Airspace.PubSub, "flight_events", msg)
+
     {:noreply, state}
   end
 
