@@ -23,7 +23,7 @@ defmodule Airspace.MixProject do
   defp deps do
     [
       {:httpoison, "~> 1.8"},
-      {:floki, "~> 0.30.0"},
+      {:floki, ">= 0.30.0"},
       {:ecto_sql, "~> 3.6"},
       {:postgrex, ">= 0.0.0"},
       {:jason, "~> 1.2"}
